@@ -11,6 +11,9 @@ public static void main(String[] args) {
     }else{
         System.out.println("Different Object");
     }
+    NetworkComponenets nc2=new Switch("Switch1",24);
+    Switch s1=(Switch) nc2.clone(); 
+    s1.display();
 }
 }
 interface NetworkComponenets{
