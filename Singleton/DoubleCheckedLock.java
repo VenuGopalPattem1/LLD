@@ -14,7 +14,7 @@ class Singleton {
     private static volatile Singleton instance = null; //volatioe  ->> risk of partially initialized object due to reordering.
 
     private Singleton() {
-    };
+    }
 
     public static Singleton getInstance() {
         if (instance == null) {
