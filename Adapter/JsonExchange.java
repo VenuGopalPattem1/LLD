@@ -11,6 +11,7 @@ public class JsonExchange {
         a.analyze();
     }
 }
+// Adaptee
 class JsonAnalyticsToll{
     private String json;
     public void setJson(String s){
@@ -25,11 +26,11 @@ class JsonAnalyticsToll{
         }
     }
 }
-
+// Target
 interface AnalyticTool {
     public void analyze();
 }
-
+// Adapter
 class AnalyticToolImpl implements AnalyticTool{
     private JsonAnalyticsToll jsonTooTol;
 
