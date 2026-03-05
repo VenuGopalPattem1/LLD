@@ -318,3 +318,281 @@ t.start(); // ✅ spawns a NEW thread
 > - Learning/simple → `Runnable`
 > - Need a result → `Callable + Future`
 > - Real application → `ExecutorService`
+
+---
+
+
+# Thread Pool & ExecutorService — Complete Guide
+
+---
+
+## The Problem First — Why Do We Need Thread Pools?
+
+```java
+// ❌ BAD — creating a new thread for every task
+for (int i = 0; i < 1000; i++) {
+    Thread t = new Thread(() -> doTask());
+    t.start(); // 1000 threads created! 💀
+}
+```
+
+**Problems with creating threads manually:**
+
+| Problem | Explanation |
+|---|---|
+| 🐢 Slow | Creating a thread is expensive — takes time & memory |
+| 💀 Uncontrolled | 1000 requests = 1000 threads = system crash |
+| ♻️ No reuse | Thread dies after task, wasted effort |
+| 🔧 Hard to manage | No easy way to track, cancel, or get results |
+
+---
+
+## What is a Thread Pool?
+
+A **Thread Pool** is a collection of **pre-created, reusable threads** that wait for tasks to execute.
+
+```
+                        THREAD POOL
+                   ┌─────────────────────┐
+Task 1 ──▶         │  Thread 1  [BUSY]   │
+Task 2 ──▶  Queue  │  Thread 2  [BUSY]   │
+Task 3 ──▶  ──▶──▶ │  Thread 3  [IDLE]   │
+Task 4 ──▶         │  Thread 4  [IDLE]   │
+Task 5 ──▶         └─────────────────────┘
+                         ↑
+                   fixed number of threads
+                   tasks WAIT in queue if
+                   all threads are busy
+```
+
+> ♻️ Threads are **reused** — finish one task, pick up the next one from the queue!
+
+---
+
+## What is `ExecutorService`?
+
+`ExecutorService` is Java's built-in **interface to manage a thread pool**.
+
+```
+You ──▶ submit(task) ──▶ ExecutorService ──▶ Thread Pool ──▶ runs task
+                              │
+                         manages all:
+                         - thread creation
+                         - task queuing
+                         - thread reuse
+                         - shutdown
+```
+
+Think of it as a **manager** — you give it tasks, it handles the rest.
+
+---
+
+## Types of Thread Pools
+
+### 1. Fixed Thread Pool
+```java
+ExecutorService ex = Executors.newFixedThreadPool(3);
+// exactly 3 threads, always
+// extra tasks wait in queue
+```
+```
+Threads:  [T1] [T2] [T3]
+Queue:    Task4 → Task5 → Task6 (waiting)
+```
+> ✅ Best for **known, stable workloads**
+
+---
+
+### 2. Cached Thread Pool
+```java
+ExecutorService ex = Executors.newCachedThreadPool();
+// creates new threads as needed
+// reuses idle threads
+// idle threads die after 60 seconds
+```
+```
+Tasks surge  →  creates more threads
+Tasks slow   →  threads die off
+```
+> ✅ Best for **many short-lived tasks**
+
+---
+
+### 3. Single Thread Executor
+```java
+ExecutorService ex = Executors.newSingleThreadExecutor();
+// only 1 thread
+// tasks run ONE BY ONE in order
+```
+```
+Task1 → Task2 → Task3  (sequential, no overlap)
+```
+> ✅ Best when **order matters**, no parallel needed
+
+---
+
+### 4. Scheduled Thread Pool
+```java
+ScheduledExecutorService ex = Executors.newScheduledThreadPool(2);
+
+// run once after 3 seconds delay
+ex.schedule(() -> System.out.println("delayed!"), 3, TimeUnit.SECONDS);
+
+// run every 2 seconds repeatedly
+ex.scheduleAtFixedRate(() -> System.out.println("repeating!"), 0, 2, TimeUnit.SECONDS);
+```
+> ✅ Best for **timers, scheduled jobs, periodic tasks**
+
+---
+
+## Core `ExecutorService` Methods
+
+```java
+ExecutorService ex = Executors.newFixedThreadPool(3);
+
+// ── Submit tasks ──────────────────────────────────
+ex.submit(runnable);          // submit Runnable (no return)
+ex.submit(callable);          // submit Callable (returns Future)
+ex.execute(runnable);         // like submit but no Future returned
+
+// ── Get results ───────────────────────────────────
+Future<Integer> f = ex.submit(callable);
+f.get();                      // block & wait for result
+f.get(2, TimeUnit.SECONDS);   // wait max 2 sec
+f.isDone();                   // check if finished
+
+// ── Shutdown ──────────────────────────────────────
+ex.shutdown();                // stop accepting new tasks, finish existing
+ex.shutdownNow();             // stop everything immediately
+ex.awaitTermination(5, TimeUnit.SECONDS); // wait max 5s for shutdown
+```
+
+---
+
+## Complete Working Example
+
+```java
+import java.util.concurrent.*;
+
+public class Main {
+    public static void main(String[] args) throws Exception {
+
+        // Step 1: Create pool with 3 threads
+        ExecutorService executor = Executors.newFixedThreadPool(3);
+
+        // Step 2: Submit 6 tasks (only 3 threads, so tasks queue up)
+        for (int i = 1; i <= 6; i++) {
+            int taskId = i;
+            executor.submit(() -> {
+                System.out.println("Task " + taskId
+                    + " started  → " + Thread.currentThread().getName());
+                try { Thread.sleep(1000); } catch (Exception e) {}
+                System.out.println("Task " + taskId
+                    + " finished → " + Thread.currentThread().getName());
+            });
+        }
+
+        // Step 3: Shutdown after all tasks done
+        executor.shutdown();
+        executor.awaitTermination(10, TimeUnit.SECONDS);
+        System.out.println("All tasks done!");
+    }
+}
+```
+
+```
+Output:
+Task 1 started  → pool-1-thread-1   ← 3 tasks run at once
+Task 2 started  → pool-1-thread-2
+Task 3 started  → pool-1-thread-3
+Task 1 finished → pool-1-thread-1   ← thread-1 now picks task 4
+Task 4 started  → pool-1-thread-1   ← ♻️ reused!
+Task 2 finished → pool-1-thread-2
+Task 5 started  → pool-1-thread-2   ← ♻️ reused!
+Task 3 finished → pool-1-thread-3
+Task 6 started  → pool-1-thread-3   ← ♻️ reused!
+Task 4 finished → pool-1-thread-1
+Task 5 finished → pool-1-thread-2
+Task 6 finished → pool-1-thread-3
+All tasks done!
+```
+
+---
+
+## With `Callable` — Getting Results Back
+
+```java
+import java.util.concurrent.*;
+
+public class Main {
+    public static void main(String[] args) throws Exception {
+        ExecutorService executor = Executors.newFixedThreadPool(3);
+
+        // Submit 3 callable tasks
+        Future<Integer> f1 = executor.submit(() -> 10 * 10);  // 100
+        Future<Integer> f2 = executor.submit(() -> 20 * 20);  // 400
+        Future<Integer> f3 = executor.submit(() -> 30 * 30);  // 900
+
+        // Collect results (blocks until each is done)
+        System.out.println("Result 1: " + f1.get());
+        System.out.println("Result 2: " + f2.get());
+        System.out.println("Result 3: " + f3.get());
+
+        executor.shutdown();
+    }
+}
+```
+
+---
+
+## Thread Pool — Full Lifecycle
+
+```
+  [CREATE]                [SUBMIT]              [EXECUTE]
+Executors.new...()  →  ex.submit(task)  →  thread picks task
+                              │                     │
+                         task queues           task runs
+                         if all busy          result stored
+                                                    │
+  [SHUTDOWN]                                  [RESULT]
+ex.shutdown()        ◀──────────────────   f.get() returns
+```
+
+---
+
+## Choosing the Right Pool
+
+```
+How many tasks?
+      │
+      ├── Fixed number, CPU heavy   →  newFixedThreadPool(n)
+      │
+      ├── Many small, short tasks   →  newCachedThreadPool()
+      │
+      ├── Must run in order         →  newSingleThreadExecutor()
+      │
+      └── Scheduled / repeating     →  newScheduledThreadPool(n)
+```
+
+---
+
+## Thread Pool vs Manual Threads
+
+| | Manual Threads | Thread Pool |
+|---|---|---|
+| Creation cost | Every time | Once at start |
+| Thread reuse | ❌ | ✅ |
+| Control | ❌ Hard | ✅ Easy |
+| Return values | ❌ | ✅ via Future |
+| Safe for production | ❌ | ✅ |
+
+---
+
+> 💡 **Golden Rules:**
+> - Always use **ExecutorService** over manual threads in real apps
+> - Always call **`shutdown()`** when done — or threads leak!
+> - Use **`Future.get()`** to collect results from `Callable`
+> - Match pool type to your **workload pattern**
+>
+>   ---
+>   
