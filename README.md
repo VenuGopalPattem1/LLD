@@ -135,3 +135,178 @@ PROCESS (Threads)
 ---
 
 > 💡 **Golden Rule:** Use **threads** for cooperation, use **processes** for isolation.
+>
+> ---
+
+
+# Ways to Create Threads in Java
+
+There are **4 main ways** to create threads in Java:
+
+---
+
+## 1. Extending `Thread` Class
+
+```java
+class MyThread extends Thread {
+    @Override
+    public void run() {
+        System.out.println("Thread running: " + Thread.currentThread().getName());
+    }
+}
+
+public class Main {
+    public static void main(String[] args) {
+        MyThread t1 = new MyThread();
+        t1.start(); // ✅ always call start(), NOT run()
+    }
+}
+```
+
+> ⚠️ **Limitation:** Java doesn't support multiple inheritance — if you extend `Thread`, you can't extend any other class.
+
+---
+
+## 2. Implementing `Runnable` Interface ✅ *(Most Common)*
+
+```java
+class MyRunnable implements Runnable {
+    @Override
+    public void run() {
+        System.out.println("Runnable running: " + Thread.currentThread().getName());
+    }
+}
+
+public class Main {
+    public static void main(String[] args) {
+        MyRunnable task = new MyRunnable();
+        Thread t1 = new Thread(task);
+        t1.start();
+    }
+}
+```
+
+> ✅ **Preferred** — separates task logic from thread management. Your class can still extend others.
+
+---
+
+## 3. Using `Callable` + `Future` *(Returns a Result)*
+
+```java
+import java.util.concurrent.*;
+
+class MyCallable implements Callable<Integer> {
+    @Override
+    public Integer call() throws Exception {
+        int sum = 0;
+        for (int i = 1; i <= 5; i++) sum += i;
+        return sum; // ✅ can return a value!
+    }
+}
+
+public class Main {
+    public static void main(String[] args) throws Exception {
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+
+        Future<Integer> future = executor.submit(new MyCallable());
+
+        System.out.println("Result: " + future.get()); // blocks until done → 15
+        executor.shutdown();
+    }
+}
+```
+
+> ✅ Use when you need a **return value** or want to **handle exceptions** from threads.
+
+---
+
+## 4. Using `ExecutorService` (Thread Pool) ✅ *(Best for Production)*
+
+```java
+import java.util.concurrent.*;
+
+public class Main {
+    public static void main(String[] args) {
+        // Create a pool of 3 threads
+        ExecutorService executor = Executors.newFixedThreadPool(3);
+
+        for (int i = 1; i <= 6; i++) {
+            int taskId = i;
+            executor.submit(() -> {
+                System.out.println("Task " + taskId + " → " + Thread.currentThread().getName());
+            });
+        }
+
+        executor.shutdown(); // ✅ always shutdown after use
+    }
+}
+```
+
+```
+Output:
+Task 1 → pool-1-thread-1
+Task 2 → pool-1-thread-2
+Task 3 → pool-1-thread-3
+Task 4 → pool-1-thread-1   ← thread reused!
+Task 5 → pool-1-thread-2
+Task 6 → pool-1-thread-3
+```
+
+> ✅ Best for real apps — **reuses threads**, avoids overhead of creating new ones every time.
+
+---
+
+## 5. Lambda / Anonymous Runnable *(Shorthand)*
+
+```java
+public class Main {
+    public static void main(String[] args) {
+
+        // Anonymous class
+        Thread t1 = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                System.out.println("Anonymous Runnable");
+            }
+        });
+
+        // Lambda (Java 8+) ✅ cleaner
+        Thread t2 = new Thread(() -> {
+            System.out.println("Lambda Thread: " + Thread.currentThread().getName());
+        });
+
+        t1.start();
+        t2.start();
+    }
+}
+```
+
+---
+
+## Comparison Table
+
+| Method | Returns Value? | Reuses Threads? | Best For |
+|---|---|---|---|
+| `extends Thread` | ❌ | ❌ | Simple/learning |
+| `implements Runnable` | ❌ | ❌ | General use |
+| `Callable + Future` | ✅ | ❌ | Need result/exception |
+| `ExecutorService` | ✅ (with Future) | ✅ | Production apps |
+| Lambda Runnable | ❌ | ❌ | Quick inline tasks |
+
+---
+
+## ⚠️ `start()` vs `run()` — Critical Difference
+
+```java
+Thread t = new Thread(() -> System.out.println(Thread.currentThread().getName()));
+
+t.run();   // ❌ runs on MAIN thread — not a new thread!
+t.start(); // ✅ spawns a NEW thread
+```
+
+---
+
+> 💡 **Rule of Thumb:**
+> - Learning/simple → `Runnable`
+> - Need a result → `Callable + Future`
+> - Real application → `ExecutorService`
