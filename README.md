@@ -195,23 +195,31 @@ public class Main {
 ```java
 import java.util.concurrent.*;
 
-class MyCallable implements Callable<Integer> {
-    @Override
-    public Integer call() throws Exception {
-        int sum = 0;
-        for (int i = 1; i <= 5; i++) sum += i;
-        return sum; // ✅ can return a value!
+public class Main {
+    public static void main(String[] args) throws Exception {
+
+        // Step 1: Wrap Callable inside FutureTask
+        FutureTask<Integer> f = new FutureTask<Integer>(new Res());
+
+        // Step 2: Wrap FutureTask inside Thread (FutureTask implements Runnable)
+        Thread t = new Thread(f);
+
+        // Step 3: ✅ START the thread FIRST!
+        t.start(); // ← YOU WERE MISSING THIS!
+
+        // Step 4: get() waits for result
+        int ans = f.get();
+        System.out.println(ans); // 10
     }
 }
 
-public class Main {
-    public static void main(String[] args) throws Exception {
-        ExecutorService executor = Executors.newSingleThreadExecutor();
-
-        Future<Integer> future = executor.submit(new MyCallable());
-
-        System.out.println("Result: " + future.get()); // blocks until done → 15
-        executor.shutdown();
+class Res implements Callable<Integer> {
+    public Integer call() {
+        int sum = 0;
+        for (int i = 0; i < 5; i++) {
+            sum += i; // 0+1+2+3+4 = 10
+        }
+        return sum;
     }
 }
 ```
