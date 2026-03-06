@@ -595,4 +595,180 @@ How many tasks?
 > - Match pool type to your **workload pattern**
 >
 >   ---
->   
+
+# Java Concurrency Basics (Interview Notes)
+
+## T1: What is Thread Safety?
+
+When multiple threads access shared data simultaneously, **thread safety** ensures the program still produces correct results.
+
+Think of it like two people editing the same Google Doc — without coordination, they may overwrite each other's changes.
+
+---
+
+## T2: Race Conditions
+
+A **race condition** occurs when the result of a program depends on the timing or order of thread execution.
+
+Example:
+
+`count++` looks like one operation but actually involves three steps:
+
+1. Read value
+2. Modify value
+3. Write value
+
+Example problem:
+
+Thread A reads `5`
+Thread B reads `5`
+
+Thread A writes `6`
+Thread B writes `6`
+
+Correct result should be `7`, but we get `6`.
+
+---
+
+## T3: synchronized
+
+The `synchronized` keyword ensures **only one thread can execute a block or method at a time**.
+
+Every Java object has a built‑in **monitor lock**.
+
+When:
+
+* Thread A acquires the lock → Thread B must wait
+* Thread A releases the lock → Thread B can enter
+
+Example:
+
+```java
+synchronized(lock) {
+    count++;
+}
+```
+
+Best practice:
+
+Use a **private lock object** instead of locking on `this`.
+
+```java
+private final Object lock = new Object();
+```
+
+---
+
+## T4: volatile
+
+Threads may cache variables locally for performance.
+
+The `volatile` keyword ensures that **reads and writes always happen from main memory**, so all threads see the latest value.
+
+Example use case:
+
+```java
+volatile boolean running = true;
+```
+
+Important:
+
+`volatile` only solves **visibility problems**, not **atomicity**.
+
+So this is still unsafe:
+
+```java
+count++
+```
+
+because it still involves multiple steps.
+
+---
+
+## T5: Atomic Variables
+
+Java provides classes such as:
+
+* `AtomicInteger`
+* `AtomicLong`
+* `AtomicBoolean`
+
+These use **CAS (Compare And Swap)** at the hardware level to perform operations atomically.
+
+Example:
+
+```java
+AtomicInteger count = new AtomicInteger(0);
+count.incrementAndGet();
+```
+
+Advantages:
+
+* No locks
+* Non‑blocking
+* Faster for simple counters
+
+---
+
+## T6: Choosing the Right Tool
+
+| Situation                                       | Use             |
+| ----------------------------------------------- | --------------- |
+| One variable, one writer, used as a flag        | `volatile`      |
+| One variable, multiple writers needing ++ or += | `AtomicInteger` |
+| Multiple variables must update together         | `synchronized`  |
+
+---
+
+## Quick Interview Summary
+
+* **Thread Safety** → Correct results with multiple threads
+* **Race Condition** → Incorrect results due to timing issues
+* **synchronized** → Lock-based mutual exclusion
+* **volatile** → Visibility guarantee
+* **Atomic Classes** → Lock‑free thread-safe operations
+
+---
+
+## Example
+
+```java
+import java.util.concurrent.atomic.AtomicInteger;
+
+class CounterExample {
+
+    static AtomicInteger count = new AtomicInteger(0);
+
+    public static void main(String[] args) throws Exception {
+
+        Thread t1 = new Thread(() -> {
+            for(int i=0;i<1000;i++)
+                count.incrementAndGet();
+        });
+
+        Thread t2 = new Thread(() -> {
+            for(int i=0;i<1000;i++)
+                count.incrementAndGet();
+        });
+
+        t1.start();
+        t2.start();
+
+        t1.join();
+        t2.join();
+
+        System.out.println(count.get());
+    }
+}
+```
+
+Expected Output:
+
+```
+2000
+```
+
+---
+
+These notes cover the most common **Java concurrency concepts asked in interviews**.
+
